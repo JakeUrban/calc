@@ -15,11 +15,15 @@ struct Operand {
     value: isize,
 }
 
-struct Node {
-    right: Option<Box<Node>>,
-    left: Option<Box<Node>>,
-    operator: Option<Operator>,
-    operand: Option<Operand>,
+struct InnerNode {
+    right: Box<Node>,
+    left: Box<Node>,
+    operator: Operator,
+}
+
+enum Node {
+    InnerNode(InnerNode),
+    Leaf(Operand)
 }
 
 fn main() {
@@ -36,53 +40,50 @@ fn build_tree(args: &[String]) -> Node {
     if args.len() == 0 {
         panic!("missing operand");
     }
-    let leaf = Node {
-        left: None,
-        right: None,
-        operator: None,
-        operand: Some(Operand {
-            value: parse_isize(&args[0]),
-        }),
-    };
+    let leaf = Node::Leaf(Operand { value: parse_isize(&args[0]) });
     if args.len() == 1 {
         return leaf;
     }
-    let mut cur = Node {
-        left: Some(Box::new(leaf)),
-        right: None,
-        operator: Some(parse_operator(&args[1])),
-        operand: None,
-    };
-    let mut right = build_tree(&args[2..]);
-    if let Some(_) = right.operand {
-        cur.right = Some(Box::new(right));
-        return cur;
+    let operator = parse_operator(&args[1]);
+    let right_tree = build_tree(&args[2..]);
+    match right_tree {
+        Node::Leaf(_) => Node::InnerNode(InnerNode {
+            left: Box::new(leaf),
+            right: Box::new(right_tree),
+            operator
+        }),
+        Node::InnerNode(mut inner_node) => {
+            let cur_op_idx = get_idx_for_op(&operator);
+            let right_op_idx = get_idx_for_op(&inner_node.operator);
+            if cur_op_idx < right_op_idx {
+                Node::InnerNode(InnerNode {
+                    left: Box::new(leaf),
+                    right: Box::new(Node::InnerNode(inner_node)),
+                    operator
+                })
+            } else {
+                let new_left = InnerNode {
+                    left: Box::new(leaf),
+                    right: inner_node.left,
+                    operator
+                };
+                inner_node.left = Box::new(Node::InnerNode(new_left));
+                Node::InnerNode(inner_node)
+            }
+        }
     }
-    let cur_op_idx = get_idx_for_op(cur.operator.as_ref().unwrap());
-    let right_op_idx = get_idx_for_op(right.operator.as_ref().unwrap());
-    let root: Node;
-    if cur_op_idx < right_op_idx {
-        cur.right = Some(Box::new(right));
-        root = cur;
-    } else {
-        cur.right = right.left;
-        right.left = Some(Box::new(cur));
-        root = right;
-    }
-    return root;
 }
 
 fn compute(n: &Node) -> isize {
-    let result: isize;
-    if let Some(_) = n.operand {
-        result = n.operand.as_ref().unwrap().value;
-    } else {
-        result = (n.operator.as_ref().unwrap().f)(
-            compute(n.left.as_ref().unwrap().as_ref()),
-            compute(n.right.as_ref().unwrap().as_ref())
-        );
+    match n {
+        Node::Leaf(operand) => operand.value,
+        Node::InnerNode(inner_node) => {
+            (inner_node.operator.f)(
+                compute(&inner_node.left),
+                compute(&inner_node.right)
+            )
+        }
     }
-    result
 }
 
 fn get_idx_for_op(op: &Operator) -> usize {
