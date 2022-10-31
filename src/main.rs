@@ -29,7 +29,7 @@ fn main() {
 }
 
 fn calc(args: &[String]) -> isize {
-    compute(&build_tree(&args))
+    compute(build_tree(&args))
 }
 
 fn build_tree(args: &[String]) -> Node {
@@ -72,14 +72,14 @@ fn build_tree(args: &[String]) -> Node {
     return root;
 }
 
-fn compute(n: &Node) -> isize {
+fn compute(n: Node) -> isize {
     let result: isize;
     if let Some(_) = n.operand {
-        result = n.operand.as_ref().unwrap().value;
+        result = n.operand.unwrap().value;
     } else {
-        result = (n.operator.as_ref().unwrap().f)(
-            compute(n.left.as_ref().unwrap().as_ref()),
-            compute(n.right.as_ref().unwrap().as_ref())
+        result = (n.operator.unwrap().f)(
+            compute(*n.left.unwrap()),
+            compute(*n.right.unwrap())
         );
     }
     result
