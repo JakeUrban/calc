@@ -40,35 +40,35 @@ fn build_tree(args: &[String]) -> Node {
     if args.len() == 0 {
         panic!("missing operand");
     }
-    let leaf = Node::Leaf(Operand { value: parse_isize(&args[0]) });
+    let left = Node::Leaf(Operand { value: parse_isize(&args[0]) });
     if args.len() == 1 {
-        return leaf;
+        return left;
     }
     let operator = parse_operator(&args[1]);
-    let right_tree = build_tree(&args[2..]);
-    match right_tree {
+    let right = build_tree(&args[2..]);
+    match right {
         Node::Leaf(_) => Node::InnerNode(InnerNode {
-            left: Box::new(leaf),
-            right: Box::new(right_tree),
+            left: Box::new(left),
+            right: Box::new(right),
             operator
         }),
-        Node::InnerNode(mut inner_node) => {
+        Node::InnerNode(mut inner_right) => {
             let cur_op_idx = get_idx_for_op(&operator);
-            let right_op_idx = get_idx_for_op(&inner_node.operator);
+            let right_op_idx = get_idx_for_op(&inner_right.operator);
             if cur_op_idx < right_op_idx {
                 Node::InnerNode(InnerNode {
-                    left: Box::new(leaf),
-                    right: Box::new(Node::InnerNode(inner_node)),
+                    left: Box::new(left),
+                    right: Box::new(Node::InnerNode(inner_right)),
                     operator
                 })
             } else {
                 let new_left = InnerNode {
-                    left: Box::new(leaf),
-                    right: inner_node.left,
+                    left: Box::new(left),
+                    right: inner_right.left,
                     operator
                 };
-                inner_node.left = Box::new(Node::InnerNode(new_left));
-                Node::InnerNode(inner_node)
+                inner_right.left = Box::new(Node::InnerNode(new_left));
+                Node::InnerNode(inner_right)
             }
         }
     }
