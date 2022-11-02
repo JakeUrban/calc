@@ -9,21 +9,17 @@ const EXP: &str = "**";
 struct Operator {
     symbol: &'static str,
     f: fn(isize, isize) -> isize,
+    right: Option<Box<Node>>,
+    left: Option<Box<Node>>,
 }
 
 struct Operand {
     value: isize,
 }
 
-struct InnerNode {
-    right: Box<Node>,
-    left: Box<Node>,
-    operator: Operator,
-}
-
 enum Node {
-    InnerNode(InnerNode),
-    Leaf(Operand)
+    InnerNode(Operator),
+    Leaf(Operand),
 }
 
 fn main() {
@@ -33,60 +29,58 @@ fn main() {
 }
 
 fn calc(args: &[String]) -> isize {
-    compute(&build_tree(&args))
+    compute(build_tree(&args))
 }
 
 fn build_tree(args: &[String]) -> Node {
     if args.len() == 0 {
         panic!("missing operand");
     }
-    let left = Node::Leaf(Operand { value: parse_isize(&args[0]) });
+    let left = Node::Leaf(Operand {
+        value: parse_isize(&args[0]),
+    });
     if args.len() == 1 {
         return left;
     }
-    let operator = parse_operator(&args[1]);
+    let (operator_fn, operator_symbol) = get_operator_fn_and_symbol(&args[1]);
+    let mut operator = Operator {
+        f: operator_fn,
+        symbol: operator_symbol,
+        left: Some(Box::new(left)),
+        right: None,
+    };
     let right = build_tree(&args[2..]);
     match right {
-        Node::Leaf(_) => Node::InnerNode(InnerNode {
-            left: Box::new(left),
-            right: Box::new(right),
-            operator
-        }),
-        Node::InnerNode(mut inner_right) => {
-            let cur_op_idx = get_idx_for_op(&operator);
-            let right_op_idx = get_idx_for_op(&inner_right.operator);
-            if cur_op_idx < right_op_idx {
-                Node::InnerNode(InnerNode {
-                    left: Box::new(left),
-                    right: Box::new(Node::InnerNode(inner_right)),
-                    operator
-                })
+        Node::Leaf(_) => {
+            operator.right = Some(Box::new(right));
+            Node::InnerNode(operator)
+        }
+        Node::InnerNode(mut right_operator) => {
+            let cur_op_priority = get_operator_priority(&operator.symbol);
+            let right_op_priority = get_operator_priority(&right_operator.symbol);
+            if cur_op_priority < right_op_priority {
+                operator.right = Some(Box::new(Node::InnerNode(right_operator)));
+                Node::InnerNode(operator)
             } else {
-                let new_left = InnerNode {
-                    left: Box::new(left),
-                    right: inner_right.left,
-                    operator
-                };
-                inner_right.left = Box::new(Node::InnerNode(new_left));
-                Node::InnerNode(inner_right)
+                operator.right = right_operator.left;
+                right_operator.left = Some(Box::new(Node::InnerNode(operator)));
+                Node::InnerNode(right_operator)
             }
         }
     }
 }
 
-fn compute(n: &Node) -> isize {
+fn compute(n: Node) -> isize {
     match n {
         Node::Leaf(operand) => operand.value,
-        Node::InnerNode(inner_node) => {
-            (inner_node.operator.f)(
-                compute(&inner_node.left),
-                compute(&inner_node.right)
-            )
-        }
+        Node::InnerNode(operator) => (operator.f)(
+            compute(*operator.left.unwrap()),
+            compute(*operator.right.unwrap()),
+        ),
     }
 }
 
-fn get_idx_for_op(op: &Operator) -> usize {
+fn get_operator_priority(symbol: &str) -> usize {
     let pemdas: [HashSet<&str>; 3] = [
         HashSet::from([PLUS, MINUS]),
         HashSet::from([MULTIPLY, DIVIDE]),
@@ -94,8 +88,8 @@ fn get_idx_for_op(op: &Operator) -> usize {
     ];
     pemdas
         .iter()
-        .position(|h| h.contains(op.symbol))
-        .expect(&format!("symbol {} not found in PEMDAS", op.symbol))
+        .position(|h| h.contains(symbol))
+        .expect(&format!("symbol {} not found in PEMDAS", symbol))
 }
 
 fn parse_isize(s: &str) -> isize {
@@ -103,28 +97,13 @@ fn parse_isize(s: &str) -> isize {
         .expect(&format!("unexpected argument: {s}, expected a number"))
 }
 
-fn parse_operator(s: &str) -> Operator {
+fn get_operator_fn_and_symbol(s: &str) -> (fn(isize, isize) -> isize, &'static str) {
     match s {
-        "+" => Operator {
-            f: |a, b| a + b,
-            symbol: PLUS,
-        },
-        "-" => Operator {
-            f: |a, b| a - b,
-            symbol: MINUS,
-        },
-        "*" => Operator {
-            f: |a, b| a * b,
-            symbol: MULTIPLY,
-        },
-        "/" => Operator {
-            f: |a, b| a / b,
-            symbol: DIVIDE,
-        },
-        "**" => Operator {
-            f: exp,
-            symbol: EXP,
-        },
+        PLUS => (|a, b| a + b, PLUS),
+        MINUS => (|a, b| a - b, MINUS),
+        MULTIPLY => (|a, b| a * b, MULTIPLY),
+        DIVIDE => (|a, b| a / b, DIVIDE),
+        EXP => (exp, EXP),
         _ => panic!("unrecognized operator {}", s),
     }
 }
