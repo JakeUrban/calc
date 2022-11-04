@@ -29,11 +29,11 @@ fn main() {
 }
 
 fn calc(args: &[String]) -> isize {
-    compute(build_tree(&args))
+    compute(build_tree(args))
 }
 
 fn build_tree(args: &[String]) -> Node {
-    if args.len() == 0 {
+    if args.is_empty() {
         panic!("missing operand");
     }
     let left = Node::Leaf(Operand {
@@ -56,8 +56,8 @@ fn build_tree(args: &[String]) -> Node {
             Node::InnerNode(operator)
         }
         Node::InnerNode(mut right_operator) => {
-            let cur_op_priority = get_operator_priority(&operator.symbol);
-            let right_op_priority = get_operator_priority(&right_operator.symbol);
+            let cur_op_priority = get_operator_priority(operator.symbol);
+            let right_op_priority = get_operator_priority(right_operator.symbol);
             if cur_op_priority < right_op_priority {
                 operator.right = Some(Box::new(Node::InnerNode(right_operator)));
                 Node::InnerNode(operator)
@@ -89,12 +89,12 @@ fn get_operator_priority(symbol: &str) -> usize {
     pemdas
         .iter()
         .position(|h| h.contains(symbol))
-        .expect(&format!("symbol {} not found in PEMDAS", symbol))
+        .unwrap_or_else(|| panic!("symbol {} not found in PEMDAS", symbol))
 }
 
 fn parse_isize(s: &str) -> isize {
     s.parse::<isize>()
-        .expect(&format!("unexpected argument: {s}, expected a number"))
+        .unwrap_or_else(|_| panic!("unexpected argument: {s}, expected a number"))
 }
 
 fn get_operator_fn_and_symbol(s: &str) -> (fn(isize, isize) -> isize, &'static str) {
